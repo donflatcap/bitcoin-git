@@ -4,57 +4,60 @@
  * W.J. van der Laan 2011-2012
  * The Bitcoin Developers 2011-2012
  */
-#include "bitcoingui.h"
-#include "transactiontablemodel.h"
+#include "aboutdialog.h"
 #include "addressbookpage.h"
+#include "addresstablemodel.h"
+#include "askpassphrasedialog.h"
+#include "bitcoingui.h"
+#include "bitcoinunits.h"
+#include "clientmodel.h"
+#include "editaddressdialog.h"
+#include "guiconstants.h"
+#include "guiutil.h"
+#include "notificator.h"
+#include "optionsdialog.h"
+#include "optionsmodel.h"
+#include "overviewpage.h"
+#include "qtipcserver.h"
+#include "rpcconsole.h"
 #include "sendcoinsdialog.h"
 #include "signverifymessagedialog.h"
-#include "optionsdialog.h"
-#include "aboutdialog.h"
-#include "clientmodel.h"
-#include "walletmodel.h"
-#include "editaddressdialog.h"
-#include "optionsmodel.h"
 #include "transactiondescdialog.h"
-#include "addresstablemodel.h"
+#include "transactiontablemodel.h"
 #include "transactionview.h"
-#include "overviewpage.h"
-#include "bitcoinunits.h"
-#include "guiconstants.h"
-#include "askpassphrasedialog.h"
-#include "notificator.h"
-#include "guiutil.h"
-#include "rpcconsole.h"
 #include "ui_interface.h"
+#include "walletmodel.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"
 #endif
 
 #include <QApplication>
-#include <QMainWindow>
-#include <QMenuBar>
-#include <QMenu>
+#include <QDateTime>
+#include <QDesktopServices>
+#include <QDragEnterEvent>
+#include <QFileDialog>
 #include <QIcon>
-#include <QTabWidget>
-#include <QVBoxLayout>
-#include <QToolBar>
-#include <QStatusBar>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPushButton>
 #include <QLocale>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QMainWindow>
+#include <QMenu>
+#include <QMenuBar>
 #include <QMessageBox>
-#include <QProgressBar>
-#include <QStackedWidget>
-#include <QDateTime>
 #include <QMovie>
-#include <QFileDialog>
-#include <QDesktopServices>
-#include <QTimer>
-#include <QDragEnterEvent>
-#include <QUrl>
+#include <QProgressBar>
+#include <QPushButton>
+#include <QStackedWidget>
+#include <QStatusBar>
 #include <QStyle>
+#include <QTabWidget>
+#include <QTimer>
+#include <QToolBar>
+#include <QUrl>
+#include <QVBoxLayout>
 
 #include <iostream>
 
@@ -181,6 +184,9 @@ BitcoinGUI::BitcoinGUI(QWidget *parent):
     this->installEventFilter(this);
 
     gotoOverviewPage();
+
+    // Create a LocalServer that receives bitcoin: payment URIs
+    createURIServer();
 }
 
 BitcoinGUI::~BitcoinGUI()
@@ -948,4 +954,52 @@ void BitcoinGUI::showNormalIfMinimized(bool fToggleHidden)
 void BitcoinGUI::toggleHidden()
 {
     showNormalIfMinimized(true);
+}
+
+void BitcoinGUI::handleCommandLineURIs()
+{
+    const QStringList& args = QCoreApplication::arguments();
+    for (int i = 1; i < args.size(); i++)
+    {
+        if (!args[i].startsWith(BITCOIN_IPC_PREFIX, Qt::CaseInsensitive))
+            continue;
+        handleURI(args[i]);
+    }
+}
+
+void BitcoinGUI::handleURIConnection()
+{
+    QLocalSocket *clientConnection = uriServer->nextPendingConnection();
+
+    while (clientConnection->bytesAvailable() < (int)sizeof(quint32))
+        clientConnection->waitForReadyRead();
+
+    connect(clientConnection, SIGNAL(disconnected()),
+            clientConnection, SLOT(deleteLater()));
+
+    QDataStream in(clientConnection);
+    in.setVersion(QDataStream::Qt_4_0);
+    if (clientConnection->bytesAvailable() < (int)sizeof(quint16)) {
+        return;
+    }
+    QString message;
+    in >> message;
+
+    handleURI(message);
+}
+
+void BitcoinGUI::createURIServer()
+{
+    QString name = ipcServerName();
+
+    // Clean up old socket leftover from a crash:
+    QLocalServer::removeServer(name);
+
+    uriServer = new QLocalServer(this);
+
+    if (!uriServer->listen(name))
+        message(tr("URI handling"), tr("Cannot start bitcoin: click-to-pay handler"),
+                CClientUIInterface::ICON_ERROR);
+    else
+        connect(uriServer, SIGNAL(newConnection()), this, SLOT(handleURIConnection()));
 }

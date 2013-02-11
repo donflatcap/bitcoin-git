@@ -1,16 +1,17 @@
 #ifndef QTIPCSERVER_H
 #define QTIPCSERVER_H
 
-#include <string>
+#include <QString>
 
-// Define Bitcoin-Qt message queue name for mainnet
-#define BITCOINURI_QUEUE_NAME_MAINNET "BitcoinURI"
-// Define Bitcoin-Qt message queue name for testnet
-#define BITCOINURI_QUEUE_NAME_TESTNET "BitcoinURI-testnet"
+const int BITCOIN_IPC_CONNECT_TIMEOUT = 1000; // milliseconds
+const QString BITCOIN_IPC_PREFIX("bitcoin:");
 
-extern std::string strBitcoinURIQueueName;
+// Unique-to-data-directory server name:
+QString ipcServerName();
 
-void ipcScanRelay(int argc, char *argv[]);
-void ipcInit(int argc, char *argv[]);
+// Returns true if bitcoin: URI successfully sent
+// to running Bitcoin-Qt.
+bool ipcSendCommands();
+
 
 #endif // QTIPCSERVER_H

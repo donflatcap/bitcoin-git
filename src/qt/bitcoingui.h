@@ -20,6 +20,7 @@ class QLabel;
 class QLineEdit;
 class QTableView;
 class QAbstractItemModel;
+class QLocalServer;
 class QModelIndex;
 class QProgressBar;
 class QStackedWidget;
@@ -99,6 +100,8 @@ private:
 
     QMovie *syncIconMovie;
 
+    QLocalServer *uriServer;
+
     /** Create the main UI actions. */
     void createActions();
     /** Create the menu bar and sub-menus. */
@@ -109,6 +112,8 @@ private:
     void createTrayIcon();
     /** Create system tray menu (or setup the dock menu) */
     void createTrayIconMenu();
+    /** Create URI server for bitcoin: uris */
+    void createURIServer();
 
 public slots:
     /** Set number of connections shown in the UI */
@@ -137,6 +142,9 @@ public slots:
       @param[out] payFee            true to pay the fee, false to not pay the fee
     */
     void askFee(qint64 nFeeRequired, bool *payFee);
+
+    void handleCommandLineURIs();
+    void handleURIConnection();
     void handleURI(QString strURI);
 
 private slots:
